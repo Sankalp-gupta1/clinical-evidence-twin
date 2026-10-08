@@ -17,6 +17,12 @@ export function getPool() {
   return pool;
 }
 export function storageMode() {
+  if (
+    ((process.env.VERCEL || process.env.NODE_ENV === 'production') &&
+      (process.env.SESSION_SECRET?.length ?? 0) < 32) ||
+    (process.env.VERCEL && !process.env.DATABASE_URL)
+  )
+    return 'Read-only preview' as const;
   return process.env.DATABASE_URL
     ? ('PostgreSQL' as const)
     : process.env.VERCEL
@@ -50,6 +56,7 @@ async function readLocal(id: string): Promise<Workspace> {
 }
 export async function readWorkspace(id: string): Promise<Workspace> {
   assertWorkspace(id);
+  if (storageMode() === 'Read-only preview') return seedWorkspace();
   const db = getPool();
   if (!db) return process.env.VERCEL ? seedWorkspace() : readLocal(id);
   const result = await db.query('SELECT data FROM cet_workspaces WHERE id=$1', [id]);
@@ -61,6 +68,10 @@ export async function mutateWorkspace<T>(
   mutate: (workspace: Workspace) => Promise<T>,
 ): Promise<{ workspace: Workspace; result: T }> {
   assertWorkspace(id);
+  if (storageMode() === 'Read-only preview')
+    throw new UnavailableError(
+      'Saving is not connected yet. The deployment needs its database and session secret.',
+    );
   const db = getPool();
   const update = async (workspace: Workspace) => {
     if (workspace.revision !== expectedRevision)

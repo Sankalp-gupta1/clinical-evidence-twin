@@ -4,12 +4,14 @@
 
 - TypeScript strict check: passed.
 - Production Next.js build: passed.
-- 16 automated tests: passed.
+- 18 automated tests: passed.
 - Real LangGraph fan-out and join: tested.
 - Human interrupt and checkpoint resume: tested with MemorySaver.
 - Separate workspace data and graph threads: tested.
 - Source validation, unit equivalence, review choices and stale updates: tested.
 - Evidence search and scope reminders: tested without a model.
+- MCP SDK client/server handshake and cross-patient source rejection: tested.
+- Hosted writes with a missing signing secret: rejected before database access.
 
 ## Requires deployment access and live service configuration
 

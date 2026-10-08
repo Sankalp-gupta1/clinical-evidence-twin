@@ -10,6 +10,7 @@ export default function ReviewModal({
   onSource,
   onSave,
   busy,
+  requestError,
 }: {
   issue: Issue;
   history: Decision[];
@@ -17,6 +18,7 @@ export default function ReviewModal({
   onSource: (id: string) => void;
   onSave: (data: Record<string, unknown>) => Promise<boolean>;
   busy: boolean;
+  requestError?: string;
 }) {
   const [outcome, setOutcome] = useState<'keep_open' | 'use_source' | 'documented'>('keep_open');
   const [claim, setClaim] = useState('');
@@ -144,7 +146,7 @@ export default function ReviewModal({
         Reviewer name
         <input value={reviewer} maxLength={80} onChange={(e) => setReviewer(e.target.value)} />
       </label>
-      {error ? <Notice error>{error}</Notice> : null}
+      {error || requestError ? <Notice error>{error || requestError}</Notice> : null}
       {history.length ? (
         <details className="decision-history">
           <summary>

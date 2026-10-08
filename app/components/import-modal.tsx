@@ -19,11 +19,13 @@ export default function ImportModal({
   onClose,
   onImport,
   busy,
+  requestError,
 }: {
   patient: Patient;
   onClose: () => void;
   onImport: (source: Source) => Promise<boolean>;
   busy: boolean;
+  requestError?: string;
 }) {
   const [record, setRecord] = useState<Source | null>(null);
   const [error, setError] = useState('');
@@ -133,7 +135,7 @@ export default function ImportModal({
           <pre>{record.text}</pre>
         </div>
       ) : null}
-      {error ? <Notice error>{error}</Notice> : null}
+      {error || requestError ? <Notice error>{error || requestError}</Notice> : null}
       <div className="modal-footer">
         <span>Original sources are never overwritten.</span>
         <button

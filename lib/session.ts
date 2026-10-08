@@ -1,10 +1,10 @@
 import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
-import { UnavailableError } from './store';
+import { UnavailableError, storageMode } from './store';
 const COOKIE = 'cet_workspace_v1';
 function secret() {
-  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
-  if (process.env.VERCEL)
+  if ((process.env.SESSION_SECRET?.length ?? 0) >= 32) return process.env.SESSION_SECRET!;
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production')
     throw new UnavailableError('Workspace sessions need a server secret before saving is enabled.');
   return 'local-development-only-do-not-use-on-a-hosted-service';
 }
@@ -23,8 +23,7 @@ export function verifySession(value: string | undefined): string | null {
 export async function workspaceSession() {
   const jar = await cookies();
   // A read-only preview has no private state and needs no session secret.
-  if (process.env.VERCEL && !process.env.SESSION_SECRET)
-    return '00000000-0000-4000-8000-000000000000';
+  if (storageMode() === 'Read-only preview') return '00000000-0000-4000-8000-000000000000';
   const existing = verifySession(jar.get(COOKIE)?.value);
   if (existing) return existing;
   const id = randomUUID();

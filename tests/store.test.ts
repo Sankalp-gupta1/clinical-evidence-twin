@@ -74,3 +74,15 @@ test('writes reject foreign browser origins', () => {
     /workspace website/,
   );
 });
+
+test('a deployment with a database but no signing secret is read-only before any DB call',async()=>{
+  const before={vercel:process.env.VERCEL,database:process.env.DATABASE_URL,secret:process.env.SESSION_SECRET};
+  process.env.VERCEL='1';process.env.DATABASE_URL='postgresql://example.invalid/should-not-be-contacted';delete process.env.SESSION_SECRET;
+  try{
+    const {storageMode,UnavailableError}=await import('../lib/store');assert.equal(storageMode(),'Read-only preview');
+    const ws=await readWorkspace(randomUUID());assert.equal(ws.revision,0);
+    await assert.rejects(mutateWorkspace(randomUUID(),0,async()=>null),UnavailableError);
+  }finally{
+    for(const [key,value] of [['VERCEL',before.vercel],['DATABASE_URL',before.database],['SESSION_SECRET',before.secret]]){if(value===undefined)delete process.env[key!];else process.env[key!]=value;}
+  }
+});

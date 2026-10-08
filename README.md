@@ -31,7 +31,7 @@ npm run dev
 
 Open `http://localhost:3000`. Local record and review changes are saved under `.data/`, which is excluded from Git. Local LangGraph checkpoints are in memory: restarting the process loses active workflow checkpoints, but source records and review notes remain. Start a new workflow after a local restart.
 
-For a production build:
+For a production build (saving requires a strong `SESSION_SECRET`; without it the app stays read-only):
 
 ```bash
 npm run build

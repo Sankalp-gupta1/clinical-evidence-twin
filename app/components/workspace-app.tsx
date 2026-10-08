@@ -865,6 +865,7 @@ export default function WorkspaceApp() {
       ) : null}
       {review ? (
         <ReviewModal
+          requestError={error}
           issue={review}
           history={data.workspace.decisions.filter(
             (d) => d.issueId === review.id && d.patientId === patientId,
@@ -884,6 +885,7 @@ export default function WorkspaceApp() {
       ) : null}
       {modal === 'import' ? (
         <ImportModal
+          requestError={error}
           patient={patient}
           onClose={() => setModal(null)}
           onImport={(record) => act({ type: 'import', patientId, record })}
@@ -1006,6 +1008,7 @@ export default function WorkspaceApp() {
           onClose={() => setModal(null)}
         >
           <div className="review-brief">{lastRun.brief}</div>
+          {error ? <Notice error>{error}</Notice> : null}
           <p className="modal-description">
             This records that you reviewed the evidence brief. It does not approve treatment or
             close the individual review items.
