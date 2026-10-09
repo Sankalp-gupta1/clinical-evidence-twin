@@ -13,6 +13,7 @@ const State = Annotation.Root({
   mode: Annotation<Answer['mode']>(),
   warning: Annotation<string | undefined>(),
   blocked: Annotation<boolean>(),
+  allowAI: Annotation<boolean>(),
 });
 export function evidenceAnswer(question: string, facts: Evidence[], patientId: string) {
   if (!facts.length)
@@ -64,7 +65,7 @@ const graph = new StateGraph(State)
     const fallback = evidenceAnswer(s.question, s.retrieved, s.patientId);
     if (!s.retrieved.length) return { ...fallback, mode: 'Evidence search' as const };
     try {
-      const generated = await synthesize(s.question, s.retrieved);
+      const generated = s.allowAI ? await synthesize(s.question, s.retrieved) : null;
       if (!generated || !generated.statements.length)
         return { ...fallback, mode: 'Evidence search' as const };
       const conflicting = conflictIssues(s.retrieved, s.patientId);
@@ -107,8 +108,12 @@ export async function answerQuestion(
   question: string,
   evidence: Evidence[],
   patientId: string,
+  allowAI = true,
 ): Promise<Answer> {
-  const result = await graph.invoke({ question, evidence, patientId }, { recursionLimit: 10 });
+  const result = await graph.invoke(
+    { question, evidence, patientId, allowAI },
+    { recursionLimit: 10 },
+  );
   return {
     id: randomUUID(),
     question,

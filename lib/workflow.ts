@@ -17,7 +17,7 @@ import {
   timelineFor,
   validateSources,
 } from './evidence';
-import { getPool } from './store';
+import { getSupportPool } from './store';
 import { approvalSchema, type Evidence, type Issue, type Source, type RunEvent } from './types';
 
 export function sourceFingerprint(sources: Source[]) {
@@ -157,7 +157,7 @@ export function makeGraph(checkpointer: MemorySaver | PostgresSaver) {
 let graph: ReturnType<typeof makeGraph> | undefined;
 export function getGraph() {
   if (!graph) {
-    const pool = getPool();
+    const pool = getSupportPool();
     graph = makeGraph(pool ? new PostgresSaver(pool) : new MemorySaver());
   }
   return graph;

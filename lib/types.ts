@@ -87,6 +87,7 @@ export type Issue = {
   status: 'open' | 'reviewed';
 };
 export type Decision = {
+  actorId?: string;
   id: string;
   issueId: string;
   patientId: string;
@@ -125,6 +126,7 @@ export type Run = {
   error?: string;
 };
 export type AuditEvent = {
+  actorId?: string;
   id: string;
   patientId: string;
   action: string;
@@ -158,6 +160,7 @@ export type Analysis = {
   conversions: Evidence[];
 };
 export type WorkspaceResponse = {
+  access?: import('./permissions').HospitalContext;
   workspace: Workspace;
   patients: Patient[];
   runtime: {

@@ -11,6 +11,8 @@ export default function ReviewModal({
   onSave,
   busy,
   requestError,
+  reviewerName,
+  readOnly = false,
 }: {
   issue: Issue;
   history: Decision[];
@@ -19,11 +21,13 @@ export default function ReviewModal({
   onSave: (data: Record<string, unknown>) => Promise<boolean>;
   busy: boolean;
   requestError?: string;
+  reviewerName: string;
+  readOnly?: boolean;
 }) {
   const [outcome, setOutcome] = useState<'keep_open' | 'use_source' | 'documented'>('keep_open');
   const [claim, setClaim] = useState('');
   const [note, setNote] = useState('');
-  const [reviewer, setReviewer] = useState('Demo reviewer');
+  const reviewer = reviewerName;
   const [error, setError] = useState('');
   async function save() {
     if (note.trim().length < 12) {
@@ -144,8 +148,13 @@ export default function ReviewModal({
       </label>
       <label className="field-label">
         Reviewer name
-        <input value={reviewer} maxLength={80} onChange={(e) => setReviewer(e.target.value)} />
+        <input value={reviewer} readOnly aria-readonly="true" />
       </label>
+      {readOnly ? (
+        <p className="notice">
+          You can compare the sources here. Saving needs a signed-in reviewer account.
+        </p>
+      ) : null}
       {error || requestError ? <Notice error>{error || requestError}</Notice> : null}
       {history.length ? (
         <details className="decision-history">
@@ -166,7 +175,7 @@ export default function ReviewModal({
         <span>
           <Check size={14} /> Original records stay unchanged
         </span>
-        <button className="button primary" disabled={busy} onClick={save}>
+        <button className="button primary" disabled={busy || readOnly} onClick={save}>
           {busy ? 'Saving…' : 'Save review'}
           <ArrowRight size={16} />
         </button>

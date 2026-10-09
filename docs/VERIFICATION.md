@@ -1,25 +1,31 @@
 # Verification record
 
-## Verified in the build workspace
+Updated 9 October 2026.
 
-- TypeScript strict check: passed.
-- Production Next.js build: passed.
-- 18 automated tests: passed.
-- Real LangGraph fan-out and join: tested.
-- Human interrupt and checkpoint resume: tested with MemorySaver.
-- Separate workspace data and graph threads: tested.
-- Source validation, unit equivalence, review choices and stale updates: tested.
-- Evidence search and scope reminders: tested without a model.
-- MCP SDK client/server handshake and cross-patient source rejection: tested.
-- Hosted writes with a missing signing secret: rejected before database access.
+## Implemented flow
 
-## Requires deployment access and live service configuration
+Homepage → account → hospital membership → scoped evidence API → PostgreSQL workspace → source-linked review → LangGraph human pause/resume.
 
-- Browser interaction and responsive visual review of the running app.
-- PostgreSQL migration and persistence across server restarts.
-- Hosted checkpoint resume across instances.
-- Live model invocation and failure behavior with provider credentials.
-- Hosted MCP endpoint with a configured token.
-- Live Vercel deployment and public URL.
+## Automated verification
 
-These are explicit pending checks, not implied successes. Update this file with observed results as each boundary is verified.
+- TypeScript strict check and Next.js production build passed.
+- 29 tests passed, including embedded PostgreSQL integration tests with the actual Better Auth handler and application API routes.
+- Sign-up, password hashing, wrong-password rejection, valid sign-in and server-side sign-out revocation passed.
+- Foreign hospital IDs and anonymous access are rejected.
+- Hospital codes produce pending requests, not access. Cross-hospital approvals are rejected.
+- Viewer writes and self-escalation are rejected server-side.
+- A reviewer-supplied false author name is replaced with the authenticated account identity.
+- Saved notes persist and do not appear in another hospital; stale revisions are rejected.
+- Removing a member immediately blocks their next read while preserving their review history.
+- A new LangGraph instance resumes a paused workflow from PostgreSQL checkpoint tables; another hospital thread sees no state.
+- The documented stdio MCP command starts and completes an SDK client handshake.
+- Existing evidence, unit, quote, date, scope, MCP handshake and patient-isolation tests pass.
+
+Embedded PostgreSQL tests are useful integration evidence, but do not prove hosted networking, TLS, concurrency under production load, live email, or model-provider behavior.
+
+## Hosted status
+
+The first read-only app was deployed and opened at https://clinical-evidence-twin.vercel.app.
+The hospital-account update is being published and checked separately. Live hospital saving is still blocked on database provisioning and the auth secret. The Neon marketplace terms require account-owner approval before provisioning can continue.
+
+AI model calls, account email delivery and a live authenticated MCP client have not been verified. No claim of production clinical readiness is made.

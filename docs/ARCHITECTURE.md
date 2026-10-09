@@ -8,18 +8,28 @@
 - `lib/questions.ts`: Question graph, evidence retrieval, output checks and fallback behavior.
 - `lib/ai.ts`: LangChain model adapters and structured outputs.
 - `lib/store.ts`: PostgreSQL transactions; local file adapter for standalone development.
-- `lib/session.ts`: Signed workspace cookie and browser-origin checks.
+- `lib/auth.ts`: Better Auth sessions, password policy, authentication rate limits and optional account email.
+- `lib/hospitals.ts`: Hospital membership, owner-approved access requests and transactional authorization.
+- `lib/permissions.ts`: Owner/reviewer/viewer capability checks.
+- `lib/schema.ts`: Additive hospital, membership, audit and usage schema.
+- `lib/session.ts`: Browser-origin checks and the legacy local session helper (not used by hospital APIs).
 - `lib/service.ts`: Validated actions, scoped workflow IDs, bounded activity and revision checks.
 - `mcp/`: Standard SDK server and five read-only tools.
 - `data/patients.ts`: Three fictional cases with intentionally planted differences.
 
 ## Data flow
 
-The browser reads `/api/workspace`. Every mutation goes through `/api/action` and a Zod discriminated union. The server gets the workspace ID from a signed cookie, never from a user-supplied workspace parameter. A database transaction locks the workspace row and checks the revision before saving.
+The public `/demo` reads only the fixed seed workspace. Its question endpoint uses that same data and explicitly disables model calls. It cannot read a hospital workspace even when the caller is signed in.
+
+Hospital pages and every protected API verify the Better Auth database session. The requested hospital ID is untrusted: the server joins it to the signed-in user's membership before reading any records. Mutations require owner or reviewer access. A transaction holds the membership row while locking the workspace row and checking its revision. Revocation and role changes serialize against in-flight writes. Unknown roles fail closed.
+
+Owner operations lock the owner's membership row, serializing access approvals and membership limits. Only the owner can access the join code, pending requests, or access audit. Requests are never auto-approved, and cannot be approved from a different hospital. Owner self-removal and role changes are blocked. The account identity is substituted server-side for every stored review author and audit actor.
+
+A separate small connection pool handles checkpoints and AI request accounting, so it does not wait for the same connection pool held by the enclosing workspace transaction.
 
 Original records are append-only at the application level. Each claim carries a source ID, verbatim excerpt, event date, and context. Source-entry dates remain separate. A review decision stores its chosen source, explanation, reviewer label and timestamp. It does not rewrite source text.
 
-The demo does not authenticate clinical staff. Reviewer names are user-entered labels and must not be described as verified identities.
+Accounts authenticate possession of an account password, not clinical credentials. Self-entered names and unverified emails are not identity proof. Before granting access, the owner must confirm the colleague outside the app. The pilot does not implement clinical credential verification, enterprise SSO, MFA or a hospital identity-provider integration.
 
 ## Temporal assumptions
 

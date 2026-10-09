@@ -7,6 +7,7 @@ import { sourceSchema, reviewSchema, approvalSchema, type Workspace } from './ty
 import { startWorkflow, resumeWorkflow, sourceFingerprint } from './workflow';
 import { answerQuestion } from './questions';
 import { storageMode } from './store';
+import type { AccountUser } from './permissions';
 
 export const actionSchema = z.discriminatedUnion('type', [
   z.object({
@@ -53,10 +54,19 @@ export async function executeAction(
   workspace: Workspace,
   sessionId: string,
   action: z.infer<typeof actionSchema>,
+  actor?: Pick<AccountUser, 'id' | 'name'>,
 ) {
   const now = new Date().toISOString();
-  const audit = (patientId: string, title: string, detail: string, actor = 'Demo reviewer') =>
-    workspace.audit.push({ id: randomUUID(), patientId, action: title, detail, actor, at: now });
+  const audit = (patientId: string, title: string, detail: string, name = 'Demo reviewer') =>
+    workspace.audit.push({
+      id: randomUUID(),
+      patientId,
+      action: title,
+      detail,
+      actor: actor?.name ?? name,
+      actorId: actor?.id,
+      at: now,
+    });
   const getPatient = (id: string) => {
     const patient = patients.find((p) => p.id === id);
     if (!patient) throw new Error('Patient not found.');
@@ -73,6 +83,8 @@ export async function executeAction(
     validateReview(issue, action.data.outcome, action.data.selectedClaimId);
     workspace.decisions.push({
       ...action.data,
+      reviewer: actor?.name ?? action.data.reviewer,
+      actorId: actor?.id,
       id: randomUUID(),
       createdAt: now,
       sourceIds: [...new Set(issue.evidence.map((e) => e.sourceId))],
@@ -150,7 +162,10 @@ export async function executeAction(
       throw new Error(
         'New records were added after this run. Start a new evidence review before approving.',
       );
-    const state = await resumeWorkflow(run.threadId, action.approval);
+    const state = await resumeWorkflow(run.threadId, {
+      ...action.approval,
+      reviewer: actor?.name ?? action.approval.reviewer,
+    });
     run.status = 'completed';
     run.events = state.events;
     run.completedAt = now;

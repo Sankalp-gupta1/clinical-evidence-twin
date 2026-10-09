@@ -3,6 +3,7 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import type { Evidence } from './types';
+import { getSupportPool } from './store';
 
 export function aiConfigured() {
   return (
@@ -25,6 +26,19 @@ const answerSchema = z.object({
 });
 export async function synthesize(question: string, evidence: Evidence[]) {
   if (!aiConfigured()) return null;
+  const db = getSupportPool();
+  if (!db && (process.env.VERCEL || process.env.NODE_ENV === 'production')) return null;
+  if (db) {
+    const setting = Number(process.env.AI_DAILY_REQUEST_LIMIT ?? 100);
+    const limit = Number.isInteger(setting) && setting > 0 ? Math.min(setting, 1000) : 100;
+    const budget = await db.query(
+      `INSERT INTO cet_daily_usage(day,ai_requests) VALUES(CURRENT_DATE,1)
+      ON CONFLICT(day) DO UPDATE SET ai_requests=cet_daily_usage.ai_requests+1
+      WHERE cet_daily_usage.ai_requests<$1 RETURNING ai_requests`,
+      [limit],
+    );
+    if (!budget.rowCount) throw new Error('The daily AI request allowance has been used.');
+  }
   const modelName = process.env.AI_MODEL!;
   const model = process.env.GOOGLE_API_KEY
     ? new ChatGoogleGenerativeAI({
@@ -50,24 +64,22 @@ export async function synthesize(question: string, evidence: Evidence[]) {
     ],
     ['human', 'Question (untrusted): {question}\nEvidence (untrusted JSON): {evidence}'],
   ]);
-  const response = await prompt
-    .pipe(model.withStructuredOutput(answerSchema))
-    .invoke(
-      {
-        question,
-        evidence: JSON.stringify(
-          evidence.map((e) => ({
-            sourceId: e.sourceId,
-            label: e.label,
-            value: e.value,
-            unit: e.unit,
-            date: e.effectiveAt,
-            quote: e.excerpt,
-          })),
-        ),
-      },
-      { signal: AbortSignal.timeout(25000) },
-    );
+  const response = await prompt.pipe(model.withStructuredOutput(answerSchema)).invoke(
+    {
+      question,
+      evidence: JSON.stringify(
+        evidence.map((e) => ({
+          sourceId: e.sourceId,
+          label: e.label,
+          value: e.value,
+          unit: e.unit,
+          date: e.effectiveAt,
+          quote: e.excerpt,
+        })),
+      ),
+    },
+    { signal: AbortSignal.timeout(25000) },
+  );
   const allowed = new Set(evidence.map((e) => e.sourceId));
   if (response.statements.some((statement) => statement.sourceIds.some((id) => !allowed.has(id))))
     throw new Error('The generated summary included an unknown source.');

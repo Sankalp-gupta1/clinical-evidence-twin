@@ -1,11 +1,23 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { seedWorkspace } from '@/data/patients';
 import type { Workspace } from './types';
 
 let pool: Pool | undefined;
+let supportPool: Pool | undefined;
+// Graph checkpoints and AI budget writes must not wait for a connection held by
+// the enclosing workspace transaction. Otherwise concurrent runs can exhaust it.
+export function getSupportPool() {
+  if (!process.env.DATABASE_URL) return undefined;
+  return (supportPool ??= new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 2,
+    connectionTimeoutMillis: 8000,
+    idleTimeoutMillis: 20000,
+  }));
+}
 export function getPool() {
   if (!process.env.DATABASE_URL) return undefined;
   pool ??= new Pool({
@@ -19,7 +31,10 @@ export function getPool() {
 export function storageMode() {
   if (
     ((process.env.VERCEL || process.env.NODE_ENV === 'production') &&
-      (process.env.SESSION_SECRET?.length ?? 0) < 32) ||
+      Math.max(
+        process.env.SESSION_SECRET?.length ?? 0,
+        process.env.BETTER_AUTH_SECRET?.length ?? 0,
+      ) < 32) ||
     (process.env.VERCEL && !process.env.DATABASE_URL)
   )
     return 'Read-only preview' as const;
@@ -54,18 +69,21 @@ async function readLocal(id: string): Promise<Workspace> {
     throw error;
   }
 }
-export async function readWorkspace(id: string): Promise<Workspace> {
+export async function readWorkspace(id: string, transaction?: PoolClient): Promise<Workspace> {
   assertWorkspace(id);
   if (storageMode() === 'Read-only preview') return seedWorkspace();
   const db = getPool();
   if (!db) return process.env.VERCEL ? seedWorkspace() : readLocal(id);
-  const result = await db.query('SELECT data FROM cet_workspaces WHERE id=$1', [id]);
+  const result = await (transaction ?? db).query('SELECT data FROM cet_workspaces WHERE id=$1', [
+    id,
+  ]);
   return result.rows[0]?.data ?? seedWorkspace();
 }
 export async function mutateWorkspace<T>(
   id: string,
   expectedRevision: number,
   mutate: (workspace: Workspace) => Promise<T>,
+  transaction?: PoolClient,
 ): Promise<{ workspace: Workspace; result: T }> {
   assertWorkspace(id);
   if (storageMode() === 'Read-only preview')
@@ -95,9 +113,9 @@ export async function mutateWorkspace<T>(
       return next;
     });
   }
-  const connection = await db.connect();
+  const connection = transaction ?? (await db.connect());
   try {
-    await connection.query('BEGIN');
+    if (!transaction) await connection.query('BEGIN');
     await connection.query(
       'INSERT INTO cet_workspaces (id,data) VALUES ($1,$2) ON CONFLICT DO NOTHING',
       [id, JSON.stringify(seedWorkspace())],
@@ -111,13 +129,13 @@ export async function mutateWorkspace<T>(
       id,
       JSON.stringify(next.workspace),
     ]);
-    await connection.query('COMMIT');
+    if (!transaction) await connection.query('COMMIT');
     return next;
   } catch (error) {
-    await connection.query('ROLLBACK');
+    if (!transaction) await connection.query('ROLLBACK');
     throw error;
   } finally {
-    connection.release();
+    if (!transaction) connection.release();
   }
 }
 export class ConflictError extends Error {}

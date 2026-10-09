@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "mcp": "node --import tsx mcp/server.ts",
     "db:migrate": "node --import tsx scripts/migrate.ts",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "db:prepare": "node --import tsx scripts/migrate.ts --if-configured"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
@@ -22,6 +23,7 @@
     "@langchain/openai": "1.6.2",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@vercel/blob": "2.8.1",
+    "better-auth": "1.7.7",
     "lucide-react": "0.577.0",
     "next": "16.4.0",
     "pg": "8.23.1",
@@ -30,6 +32,8 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-socket": "^0.2.11",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.15.0",
     "@types/react": "^19.2.0",

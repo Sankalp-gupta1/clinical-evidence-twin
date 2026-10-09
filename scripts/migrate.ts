@@ -1,14 +1,35 @@
-import { Pool } from 'pg';
+import { getMigrations } from 'better-auth/db/migration';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
-if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-try {
-  await pool.query(
-    `CREATE TABLE IF NOT EXISTS cet_workspaces (id UUID PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()); CREATE INDEX IF NOT EXISTS cet_workspaces_updated_idx ON cet_workspaces(updated_at);`,
-  );
-  const saver = new PostgresSaver(pool);
-  await saver.setup();
-  console.log('Workspace tables and LangGraph checkpoints are ready.');
-} finally {
-  await pool.end();
+import { getAuth, accountsConfigured } from '../lib/auth';
+import { getPool } from '../lib/store';
+import { hospitalSchema } from '../lib/schema';
+
+async function main() {
+  if (!accountsConfigured()) {
+    if (process.argv.includes('--if-configured')) {
+      console.log('Account setup is incomplete. Building the read-only demo and setup screens.');
+      process.exit(0);
+    }
+    throw new Error('DATABASE_URL and BETTER_AUTH_SECRET (32+ characters) are required.');
+  }
+  const pool = getPool()!;
+  const lock = await pool.connect();
+  try {
+    await lock.query('SELECT pg_advisory_lock(48219013)');
+    const migration = await getMigrations(getAuth().options);
+    await migration.runMigrations();
+    await pool.query(hospitalSchema);
+    await new PostgresSaver(pool).setup();
+    console.log('Accounts, hospital access, source storage and workflow checkpoints are ready.');
+  } finally {
+    await lock.query('SELECT pg_advisory_unlock(48219013)');
+    lock.release();
+    await pool.end();
+  }
 }
+void main().catch(() => {
+  console.error(
+    'Database preparation failed. Check the private provider logs and migration configuration.',
+  );
+  process.exitCode = 1;
+});

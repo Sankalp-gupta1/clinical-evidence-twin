@@ -22,7 +22,9 @@ export async function POST(request: Request) {
   const text = await request.text();
   if (text.length > 24000) return Response.json({ error: 'Request too large' }, { status: 413 });
   const server = createEvidenceServer(
-    process.env.MCP_WORKSPACE_ID ? () => readWorkspace(process.env.MCP_WORKSPACE_ID!) : undefined,
+    process.env.MCP_ALLOW_HOSPITAL_ACCESS === 'true' && process.env.MCP_WORKSPACE_ID
+      ? () => readWorkspace(process.env.MCP_WORKSPACE_ID!)
+      : undefined,
   );
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

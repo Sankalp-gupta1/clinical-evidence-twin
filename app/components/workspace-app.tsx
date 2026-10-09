@@ -1,5 +1,8 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { SignOutButton } from './account-ui';
+import type { HospitalContext } from '@/lib/permissions';
 import {
   Activity,
   ArrowDownToLine,
@@ -62,7 +65,13 @@ const initial: WorkspaceResponse = {
     checkpoint: 'Checking connection…',
   },
 };
-export default function WorkspaceApp() {
+export default function WorkspaceApp({
+  demo = false,
+  context,
+}: {
+  demo?: boolean;
+  context?: HospitalContext;
+}) {
   const [data, setData] = useState<WorkspaceResponse>(initial);
   const [patientId, setPatientId] = useState('demo-mira');
   const [view, setView] = useState<View>('overview');
@@ -77,7 +86,12 @@ export default function WorkspaceApp() {
   const [review, setReview] = useState<Issue | null>(null);
   const [filter, setFilter] = useState('all');
   const [reviewNote, setReviewNote] = useState('');
-  const [reviewer, setReviewer] = useState('Demo reviewer');
+  const reviewer = context?.user.name ?? 'Demo reviewer';
+  const canWrite =
+    !demo &&
+    !!context &&
+    context.hospital.role !== 'viewer' &&
+    data.runtime.storage !== 'Read-only preview';
   const patient = data.patients.find((p) => p.id === patientId)!;
   const records = data.workspace.sources.filter((s) => s.patientId === patientId);
   const analysis = useMemo(
@@ -91,9 +105,17 @@ export default function WorkspaceApp() {
   async function refresh() {
     setLoading(true);
     try {
-      const response = await fetch('/api/workspace', { cache: 'no-store' });
+      const response = await fetch(
+        demo
+          ? '/api/workspace?demo=true'
+          : `/api/workspace?hospitalId=${encodeURIComponent(context?.hospital.id ?? '')}`,
+        { cache: 'no-store' },
+      );
       const next = await response.json();
-      if (!response.ok) throw new Error(next.error);
+      if (!response.ok) {
+        if (response.status === 401) window.location.assign('/sign-in');
+        throw new Error(next.error);
+      }
       setData(next);
       setError('');
     } catch (e) {
@@ -131,18 +153,46 @@ export default function WorkspaceApp() {
   }
   async function act(action: Record<string, unknown>): Promise<boolean> {
     if (busy || loading) return false;
+    if (!canWrite && !(demo && action.type === 'question')) {
+      setError(
+        demo
+          ? 'Create a hospital account to save reviews and run workflows.'
+          : 'Your role can read and export. Ask your hospital owner for reviewer access.',
+      );
+      return false;
+    }
     setBusy(true);
     setError('');
     try {
-      const response = await fetch('/api/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...action, revision: data.workspace.revision }),
-      });
+      const response = await fetch(
+        demo && action.type === 'question' ? '/api/demo/question' : '/api/action',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...action,
+            hospitalId: context?.hospital.id,
+            revision: data.workspace.revision,
+          }),
+        },
+      );
       const result = await response.json();
       if (!response.ok) {
         if (response.status === 409) await refresh();
         throw new Error(result.error ?? 'The action could not be saved.');
+      }
+      if (demo && result.answer) {
+        setData((prev) => ({
+          ...prev,
+          workspace: {
+            ...prev.workspace,
+            answers: {
+              ...prev.workspace.answers,
+              [patientId]: [...(prev.workspace.answers[patientId] ?? []), result.answer].slice(-8),
+            },
+          },
+        }));
+        return true;
       }
       setData((prev) => ({ ...prev, workspace: result.workspace, runtime: result.runtime }));
       setToast(result.result.message);
@@ -154,7 +204,7 @@ export default function WorkspaceApp() {
       setBusy(false);
     }
   }
-  const disabled = busy || loading;
+  const disabled = busy || loading || !canWrite;
   const exportBrief = () =>
     `# Evidence review — ${patient.name}\n\nSynthetic demonstration case · ${patient.id}\nExported ${new Date().toISOString()}\n\n## Scope\nEvidence organization only. No diagnosis, prescription, or treatment recommendation.\n\n## Record coverage\n${records.length} records; ${analysis.evidence.length} statements; ${openIssues.length} open review items.\n\n## Review items\n${analysis.issues.map((issue) => `### ${issue.title}\nStatus: ${issue.status}\n${issue.detail}\n${issue.evidence.map((e) => `- [${e.sourceId}] ${e.excerpt}`).join('\n')}`).join('\n\n')}\n\n## Reviewer notes\n${
       data.workspace.decisions
@@ -181,8 +231,12 @@ export default function WorkspaceApp() {
             <Users size={18} />
           </span>
           <div>
-            <strong>Research workspace</strong>
-            <small>Synthetic cases only</small>
+            <strong>{context?.hospital.name ?? 'Explore the demo'}</strong>
+            <small>
+              {context
+                ? `${context.hospital.role} · hospital pilot`
+                : 'Fictional cases · read only'}
+            </small>
           </div>
           <ChevronDown size={15} />
         </div>
@@ -242,12 +296,20 @@ export default function WorkspaceApp() {
             <ArrowUpRight size={14} />
           </button>
           <div className="profile">
-            <span>DR</span>
+            <span>{context?.user.name.slice(0, 2).toUpperCase() ?? 'DE'}</span>
             <div>
-              <strong>Demo reviewer</strong>
-              <small>Your browser workspace</small>
+              <strong>{context?.user.name ?? 'Demo explorer'}</strong>
+              <small>{context ? 'Signed in to your hospital' : 'No account needed'}</small>
             </div>
-            <MoreHorizontal size={17} />
+            {context ? (
+              <Link href="/hospital" aria-label="My hospital account">
+                <ArrowUpRight size={17} />
+              </Link>
+            ) : (
+              <Link href="/sign-in" aria-label="Sign in">
+                <ArrowUpRight size={17} />
+              </Link>
+            )}
           </div>
         </div>
       </aside>
@@ -268,7 +330,7 @@ export default function WorkspaceApp() {
             >
               <Menu size={21} />
             </button>
-            <span>Workspace</span>
+            <Link href={context ? '/hospital' : '/'}>{context ? 'My hospital' : 'Home'}</Link>
             <ChevronRight size={14} />
             <strong>
               {view === 'about' ? 'How it works' : views.find((v) => v.id === view)?.label}
@@ -347,7 +409,7 @@ export default function WorkspaceApp() {
             </div>
             <span className="demo-pill">
               <span />
-              Demo environment
+              Fictional case pilot
             </span>
             <button
               className="icon-button help-button"
@@ -359,6 +421,21 @@ export default function WorkspaceApp() {
           </div>
         </header>
         <div className="page-content">
+          <div className="workspace-account-strip">
+            <span>
+              <ShieldCheck size={16} />
+              {demo
+                ? 'Public demo · source search works here. Sign in to save reviews.'
+                : `Private workspace · ${context?.hospital.name} · ${context?.hospital.role}`}
+            </span>
+            {context ? (
+              <SignOutButton />
+            ) : (
+              <Link href="/sign-up" className="text-button">
+                Create your workspace <ArrowRight size={15} />
+              </Link>
+            )}
+          </div>
           <div className="page-heading">
             <div>
               <div className="eyebrow">CLARITY STARTS WITH THE SOURCE</div>
@@ -393,7 +470,7 @@ export default function WorkspaceApp() {
               <button
                 className="button primary"
                 onClick={() => setModal('import')}
-                disabled={loading}
+                disabled={disabled}
               >
                 <Plus size={17} />
                 Add record
@@ -414,6 +491,45 @@ export default function WorkspaceApp() {
               Loading your saved workspace…
             </div>
           ) : null}
+          <section className="next-step-banner">
+            <div>
+              <span className="section-kicker">WHAT TO DO NEXT</span>
+              <strong>
+                {!data.workspace.decisions.some((d) => d.patientId === patientId)
+                  ? 'Compare one difference in the records.'
+                  : !lastRun
+                    ? 'Run the evidence checks for this case.'
+                    : lastRun.status === 'waiting'
+                      ? 'Read the brief and add your review note.'
+                      : 'Export your reviewed evidence brief.'}
+              </strong>
+              <p>
+                {!data.workspace.decisions.some((d) => d.patientId === patientId)
+                  ? 'Open Needs review, read both sources, and record what still needs confirmation.'
+                  : !lastRun
+                    ? 'The checks build a timeline, compare statements, and identify missing information.'
+                    : lastRun.status === 'waiting'
+                      ? 'The workflow is paused for you. Open issues remain visible after your review.'
+                      : 'Your review has been saved. Open questions remain linked to the original records.'}
+              </p>
+            </div>
+            <button
+              className="button secondary"
+              onClick={() => {
+                if (!data.workspace.decisions.some((d) => d.patientId === patientId))
+                  navigate('review');
+                else if (lastRun?.status === 'completed') setModal('export');
+                else navigate('workflow');
+              }}
+            >
+              {!data.workspace.decisions.some((d) => d.patientId === patientId)
+                ? 'Compare records'
+                : lastRun?.status === 'completed'
+                  ? 'Export brief'
+                  : 'Open workflow'}
+              <ArrowRight size={16} />
+            </button>
+          </section>
           <section className="patient-banner">
             <div className="patient-identity">
               <span className={`patient-large avatar-${patient.color}`}>
@@ -644,7 +760,11 @@ export default function WorkspaceApp() {
                         </button>
                       ))}
                   </div>
-                  <button className="add-record-card" onClick={() => setModal('import')}>
+                  <button
+                    className="add-record-card"
+                    disabled={disabled}
+                    onClick={() => setModal('import')}
+                  >
                     <Upload size={20} />
                     <span>
                       <strong>Add another piece of the story</strong>
@@ -825,7 +945,7 @@ export default function WorkspaceApp() {
                 patientName={patient.name}
                 answers={answers}
                 ai={data.runtime.ai}
-                busy={disabled}
+                busy={busy || loading || (!canWrite && !demo)}
                 onAsk={(question) => act({ type: 'question', patientId, question })}
                 onSource={openSource}
               />
@@ -873,7 +993,9 @@ export default function WorkspaceApp() {
           onClose={() => setReview(null)}
           onSource={openSource}
           onSave={(data) => act({ type: 'review', data })}
-          busy={busy}
+          busy={disabled}
+          reviewerName={reviewer}
+          readOnly={!canWrite}
         />
       ) : null}
       {source ? (
@@ -1026,11 +1148,11 @@ export default function WorkspaceApp() {
           </label>
           <label className="field-label">
             Reviewer name
-            <input value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
+            <input value={reviewer} readOnly aria-readonly="true" />
           </label>
           <button
             className="button primary full"
-            disabled={busy || reviewNote.trim().length < 12 || reviewer.trim().length < 2}
+            disabled={disabled || reviewNote.trim().length < 12 || reviewer.trim().length < 2}
             onClick={async () => {
               if (
                 await act({
@@ -1423,7 +1545,7 @@ function About({ runtime }: { runtime: WorkspaceResponse['runtime'] }) {
         </div>
         <p>
           {runtime.storage === 'PostgreSQL'
-            ? 'Review notes and workflow checkpoints are saved in the database. Your session cookie separates this browser workspace from others.'
+            ? 'Review notes and workflow checkpoints are saved in the database. Your signed-in account and hospital membership control access to this workspace.'
             : runtime.storage === 'Local file'
               ? 'Sources and review notes are saved on this server. Active workflow checkpoints last only until the local process restarts.'
               : 'A database has not been connected. The sample records can be explored, but changes cannot be saved.'}

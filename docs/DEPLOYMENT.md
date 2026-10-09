@@ -1,42 +1,54 @@
 # Deployment
 
-Use a new Vercel project for this repository. The Next.js app is at the repository root. Do not change or reuse an unrelated project.
+The existing Vercel project is `clinical-evidence-twin`, connected to `Sankalp-gupta1/clinical-evidence-twin`, branch `main`, root `./`. Do not create a nested project or reuse an unrelated database.
 
-## Required setup
+## Required account setup
 
-1. Link the `clinical-evidence-twin` project in the intended account.
-2. Provision a dedicated PostgreSQL database. Choose a free plan explicitly; do not enable paid upgrades by accident.
-3. Set `DATABASE_URL` using the provider's verified TLS configuration. Do not disable certificate verification.
-4. Generate a random `SESSION_SECRET` with at least 32 random bytes. Set it as a server secret in Vercel for each environment that can save data.
-5. Pull environment variables into `.env.local` through the Vercel CLI. Never print or commit that file.
-6. Run the migration with the environment loaded:
+1. Create a dedicated PostgreSQL database through the Vercel Storage marketplace. Select the free plan explicitly. Provider terms must be accepted by the account owner; no paid upgrade is required by this code.
+2. Connect it to this project. Let the integration provision `DATABASE_URL`; do not paste credentials into GitHub or chat.
+3. Generate a random `BETTER_AUTH_SECRET` with at least 32 random bytes and save it as a server-only Vercel secret. Do not use a sample, account password, or repository value.
+4. Set `BETTER_AUTH_URL=https://clinical-evidence-twin.vercel.app` for Production. For local use set `http://localhost:3000`. Use a separate database and secret for previews; do not share production data with arbitrary preview builds.
+5. Redeploy. `vercel.json` runs `npm run db:prepare` then the production build. The preparation script runs additive Better Auth, hospital, and LangGraph migrations, guarded by a PostgreSQL advisory lock. It skips account setup if required configuration is absent. A configured but failed migration fails the build.
+6. Verify `/api/health`, then sign up, create a hospital, save a review, refresh, run and resume the evidence workflow, sign out, and confirm the old session no longer reads the workspace.
+
+Migrations do not drop source data. Back up the database before future schema changes. Runtime credentials currently have schema privileges for build-time migration; a separate migration role and least-privilege runtime role are recommended before real deployment.
+
+## Local account setup
+
+Use a dedicated development PostgreSQL database and put the same keys in `.env.local`.
 
 ```bash
+npm ci
 node --env-file=.env.local --import tsx scripts/migrate.ts
+npm run dev
 ```
 
-7. Run `npm test`, `npm run typecheck`, and `npm run build`.
-8. Deploy the `main` branch. Verify `/api/health`, then create a review note, refresh the page, run the workflow, and resume it.
+The plain demo can run without these credentials. The test suite creates an isolated embedded PostgreSQL instance; no hosted credentials or paid API are needed for tests.
 
 ## Environment keys
 
-| Key                | Purpose                                    | Required                                   |
-| ------------------ | ------------------------------------------ | ------------------------------------------ |
-| DATABASE_URL       | Workspace data and checkpoint storage      | Hosted writes                              |
-| SESSION_SECRET     | Signs the anonymous demo workspace cookie  | Hosted writes                              |
-| AI_ENABLED         | Explicitly enables optional model requests | Defaults to false                          |
-| AI_MODEL           | Exact supported provider/model ID          | AI mode                                    |
-| GOOGLE_API_KEY     | Direct Gemini authentication               | If using Gemini directly                   |
-| AI_GATEWAY_API_KEY | Gateway authentication                     | Optional if valid Vercel OIDC is available |
-| MCP_ACCESS_TOKEN   | Bearer authentication for hosted MCP       | Hosted MCP                                 |
-| MCP_WORKSPACE_ID   | Exact workspace exposed to MCP             | Optional; otherwise seed data only         |
+| Key                       | Purpose                                                              | Required                     |
+| ------------------------- | -------------------------------------------------------------------- | ---------------------------- |
+| DATABASE_URL              | Accounts, hospital data and workflow checkpoints                     | Accounts/saved reviews       |
+| BETTER_AUTH_SECRET        | Random secret for Better Auth                                        | Accounts                     |
+| BETTER_AUTH_URL           | Canonical application origin                                         | Production accounts          |
+| RESEND_API_KEY            | Optional account-email provider credential                           | Verification/recovery email  |
+| EMAIL_FROM                | Verified sender address in the email provider                        | Verification/recovery email  |
+| AI_ENABLED                | Explicitly enable model calls                                        | Defaults to false            |
+| AI_MODEL                  | Exact supported provider/model ID                                    | AI summaries                 |
+| GOOGLE_API_KEY            | Direct Gemini credential                                             | If using direct Gemini       |
+| AI_GATEWAY_API_KEY        | Gateway credential                                                   | Or a valid Vercel OIDC token |
+| AI_DAILY_REQUEST_LIMIT    | Shared deployment request cap; 100 by default, max 1000              | Optional                     |
+| MCP_ACCESS_TOKEN          | Strong bearer token for hosted MCP                                   | Hosted MCP                   |
+| MCP_WORKSPACE_ID          | Exact hospital UUID for a configured integration                     | Optional                     |
+| MCP_ALLOW_HOSPITAL_ACCESS | Explicitly permit that MCP integration to read the selected hospital | Defaults to false            |
 
-No secret belongs in a `NEXT_PUBLIC_` variable.
+No secret belongs in a `NEXT_PUBLIC_` variable. `SESSION_SECRET` is only used by the legacy local anonymous-session helper; it is not a substitute for hospital authentication.
 
-## Local and deployed behavior
+## Account email
 
-Local standalone development does not depend on Vercel services. It uses a file store and a clearly labeled memory checkpoint. Vercel's serverless filesystem is not used for durable writes. If database setup is incomplete, the deployed app stays in read-only preview mode.
+Email delivery is optional for the synthetic pilot. Without it, account creation and owner-approved team requests still work, but email verification and password recovery are unavailable. The UI says so and never pretends a reset email was sent. Owners cannot read or reset user passwords. Connect a verified sender before a wider pilot; the code supports Resend verification/reset messages. Do not send account emails to anyone as part of setup tests.
 
-## Before real use
+## Remaining operational work
 
-This deployment is for fictional demo records. Real patient use needs clinician-led validation, identity and access management, retention and deletion policies, formal threat modelling, audit controls, external review, and the applicable agreements and approvals. A signed anonymous browser cookie is not staff authentication. Local file storage is single-process development support, not a production database.
+This is a fictional-data pilot. Before real patient use: validate clinical behavior, use an approved identity provider and MFA, establish retention/deletion/backups, add monitoring and recovery drills, review infrastructure and data-processing agreements, and obtain the applicable approvals. No regulatory or clinical-readiness claim is made.
