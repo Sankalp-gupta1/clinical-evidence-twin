@@ -21,6 +21,8 @@ Homepage → account → hospital membership → scoped evidence API → Postgre
 - The documented stdio MCP command starts and completes an SDK client handshake.
 - Existing evidence, unit, quote, date, scope, MCP handshake and patient-isolation tests pass.
 
+After connecting the hosted Neon database, the focused account suite passed all 11 checks, including a new test that executes the real deployment migration command twice against a fresh PostgreSQL fixture. It verifies direct-connection selection, initial table creation, and repeatable migration. TypeScript checking also passed.
+
 Embedded PostgreSQL tests are useful integration evidence, but do not prove hosted networking, TLS, concurrency under production load, live email, or model-provider behavior.
 
 ## Hosted status
@@ -36,8 +38,8 @@ Live browser checks confirmed:
 - Public demo writes are disabled; account pages explain the missing setup and disable account submission.
 - The homepage has no horizontal overflow at the tested 1348-pixel viewport. Mobile visual testing remains pending.
 
-The browser check also identified two presentation fixes included in the next commit: make the homepage illustration match the actual case dates and distinguish read-only permissions from an active saving/loading state.
+The browser check identified two presentation fixes: make the homepage illustration match the actual case dates and distinguish read-only permissions from an active saving/loading state. These were published as `6bbf50f`; Vercel showed Ready and the corrected homepage and disabled "Save review" label were verified live.
 
-Live hospital saving is still blocked on database provisioning and the auth secret. The Neon marketplace terms require account-owner approval before provisioning can continue. Hospital creation, team management and login/logout have passed database-backed integration tests, but the hosted account flow cannot be tested until this setup is complete.
+The account owner completed Neon setup on 9 October 2026. The dedicated database is Available on the Free plan and connected to this project. Provider-managed database variables are present, and the production authentication URL has been saved. The production `BETTER_AUTH_SECRET` still needs secure entry by the account owner, followed by deployment and hosted account testing. Hospital creation, team management and login/logout have passed database-backed integration tests; live account activation and hosted database migrations remain pending.
 
 AI model calls, account email delivery and a live authenticated MCP client have not been verified. No claim of production clinical readiness is made.

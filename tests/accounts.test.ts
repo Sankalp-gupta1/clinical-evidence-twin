@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { Command } from '@langchain/langgraph';
 import { makeGraph } from '../lib/workflow';
 import { seedWorkspace } from '../data/patients';
-import { getMigrations } from 'better-auth/db/migration';
 import { getAuth } from '../lib/auth';
 import { getPool, readWorkspace } from '../lib/store';
-import { hospitalSchema } from '../lib/schema';
 import { requirePermission, AccessError, type AccountUser } from '../lib/permissions';
 import { hospitalAction, hospitalsFor, withHospital, signedInUser } from '../lib/hospitals';
 import { POST as writeAction } from '../app/api/action/route';
@@ -58,8 +58,29 @@ test(
       return { user: session, cookie, password };
     }
     try {
-      await (await getMigrations(auth.options)).runMigrations();
-      await pool.query(hospitalSchema);
+      await t.test(
+        'deployment migrations use the direct connection and can run twice',
+        async () => {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const result = await promisify(execFile)(
+              process.execPath,
+              ['--import', 'tsx', 'scripts/migrate.ts'],
+              {
+                env: {
+                  ...process.env,
+                  DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:1/unreachable',
+                  DATABASE_URL_UNPOOLED: process.env.DATABASE_URL,
+                },
+                timeout: 20000,
+              },
+            );
+            assert.match(
+              result.stdout,
+              /Accounts, hospital access, source storage and workflow checkpoints are ready/,
+            );
+          }
+        },
+      );
       const owner = await signup('Pilot Owner', 'owner@example.com');
       const colleague = await signup('Pilot Colleague', 'colleague@example.com');
       const outsider = await signup('Other Hospital Owner', 'other@example.com');
