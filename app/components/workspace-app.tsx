@@ -928,7 +928,8 @@ export default function WorkspaceApp({
                 <Workflow
                   run={lastRun}
                   runs={runs}
-                  busy={disabled}
+                  busy={busy || loading}
+                  readOnly={!canWrite}
                   onStart={() => void act({ type: 'run', patientId })}
                   onApprove={() => {
                     setReviewNote('');
@@ -945,7 +946,8 @@ export default function WorkspaceApp({
                 patientName={patient.name}
                 answers={answers}
                 ai={data.runtime.ai}
-                busy={busy || loading || (!canWrite && !demo)}
+                busy={busy || loading}
+                readOnly={!canWrite && !demo}
                 onAsk={(question) => act({ type: 'question', patientId, question })}
                 onSource={openSource}
               />
@@ -993,7 +995,7 @@ export default function WorkspaceApp({
           onClose={() => setReview(null)}
           onSource={openSource}
           onSave={(data) => act({ type: 'review', data })}
-          busy={disabled}
+          busy={busy || loading}
           reviewerName={reviewer}
           readOnly={!canWrite}
         />
@@ -1351,6 +1353,7 @@ function Workflow({
   run,
   runs,
   busy,
+  readOnly,
   onStart,
   onApprove,
   checkpoint,
@@ -1358,6 +1361,7 @@ function Workflow({
   run?: Run;
   runs: Run[];
   busy: boolean;
+  readOnly: boolean;
   onStart: () => void;
   onApprove: () => void;
   checkpoint: string;
@@ -1399,11 +1403,17 @@ function Workflow({
             then pauses until you review the brief.
           </p>
         </div>
-        <button className="button primary" disabled={busy} onClick={onStart}>
+        <button className="button primary" disabled={busy || readOnly} onClick={onStart}>
           {busy ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}Run evidence
           checks
         </button>
       </section>
+      {readOnly ? (
+        <p className="notice">
+          You can explore the steps below. Running checks needs reviewer access to a hospital
+          workspace.
+        </p>
+      ) : null}
       <div className="workflow-canvas">
         <div className="flow-start">RECORDS ENTER HERE</div>
         {step('validate', 'Check the patient', 'Exact ID and source-quote checks', Users)}
@@ -1432,7 +1442,7 @@ function Workflow({
           </div>
           <p>{run.brief}</p>
           {run.status === 'waiting' ? (
-            <button className="button primary" disabled={busy} onClick={onApprove}>
+            <button className="button primary" disabled={busy || readOnly} onClick={onApprove}>
               Review this brief
               <ArrowRight size={16} />
             </button>

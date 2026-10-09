@@ -75,8 +75,8 @@ export default function Landing() {
               <div>
                 <span />
                 <div>
-                  <small>17 JUL</small>
-                  <strong>First hospital visit</strong>
+                  <small>04 JUL</small>
+                  <strong>Initial consultation</strong>
                   <p>The note records an allergy history.</p>
                   <span className="source-chip">
                     <FileText size={12} /> Original visit note
@@ -86,11 +86,11 @@ export default function Landing() {
               <div>
                 <span />
                 <div>
-                  <small>19 JUL</small>
+                  <small>17 JUL</small>
                   <strong>A different account</strong>
-                  <p>The discharge record lists no known allergies.</p>
+                  <p>The admission record lists no known drug allergies.</p>
                   <span className="source-chip">
-                    <FileText size={12} /> Discharge summary
+                    <FileText size={12} /> Hospital admission record
                   </span>
                 </div>
               </div>

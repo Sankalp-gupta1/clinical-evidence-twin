@@ -8,6 +8,7 @@ export default function QuestionPanel({
   patientName,
   ai,
   busy,
+  readOnly = false,
   onAsk,
   onSource,
 }: {
@@ -15,6 +16,7 @@ export default function QuestionPanel({
   patientName: string;
   ai: boolean;
   busy: boolean;
+  readOnly?: boolean;
   onAsk: (question: string) => Promise<boolean>;
   onSource: (id: string) => void;
 }) {
@@ -25,7 +27,7 @@ export default function QuestionPanel({
     end.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [answers.length]);
   async function ask(value: string) {
-    if (value.trim().length < 3 || busy) return;
+    if (value.trim().length < 3 || busy || readOnly) return;
     if (await onAsk(value.trim())) setQuestion('');
   }
   return (
@@ -91,7 +93,7 @@ export default function QuestionPanel({
                     'What is the recorded weight?',
                     'What do the allergy records say?',
                   ].map((q) => (
-                    <button key={q} onClick={() => void ask(q)} disabled={busy}>
+                    <button key={q} onClick={() => void ask(q)} disabled={busy || readOnly}>
                       {q}
                       <ArrowUp size={14} />
                     </button>
@@ -120,6 +122,7 @@ export default function QuestionPanel({
             </label>
             <textarea
               id="question"
+              disabled={readOnly}
               value={question}
               maxLength={700}
               onChange={(e) => setQuestion(e.target.value)}
@@ -134,11 +137,20 @@ export default function QuestionPanel({
             />
             <div>
               <span>Enter to send · Shift + Enter for a new line</span>
-              <button disabled={busy || question.trim().length < 3} aria-label="Send question">
+              <button
+                disabled={busy || readOnly || question.trim().length < 3}
+                aria-label="Send question"
+              >
                 <ArrowUp size={19} />
               </button>
             </div>
           </form>
+          {readOnly ? (
+            <p className="notice">
+              Reviewer access is needed to ask and save new questions. You can read earlier answers
+              and open their sources.
+            </p>
+          ) : null}
           <div className="assistant-boundary">
             <ShieldCheck size={15} />
             <span>
