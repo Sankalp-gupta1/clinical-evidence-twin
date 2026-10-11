@@ -1,6 +1,6 @@
 # Verification record
 
-Updated 9 October 2026.
+Updated 11 October 2026. Earlier observations retain their original dates below.
 
 ## Implemented flow
 
@@ -40,6 +40,25 @@ Live browser checks confirmed:
 
 The browser check identified two presentation fixes: make the homepage illustration match the actual case dates and distinguish read-only permissions from an active saving/loading state. These were published as `6bbf50f`; Vercel showed Ready and the corrected homepage and disabled "Save review" label were verified live.
 
-The account owner completed Neon setup on 9 October 2026. The dedicated database is Available on the Free plan and connected to this project. Provider-managed database variables are present, and the production authentication URL has been saved. The production `BETTER_AUTH_SECRET` still needs secure entry by the account owner, followed by deployment and hosted account testing. Hospital creation, team management and login/logout have passed database-backed integration tests; live account activation and hosted database migrations remain pending.
+The account owner completed Neon setup and securely entered the production authentication secret on 9 October 2026. The dedicated database was Available on the Free plan and connected to this project. Provider-managed database variables and the production authentication URL were present; no credential values were read or copied into this repository.
+
+Production deployment `6fYBvSHdCXXqoNqWBSoU3yANe5bk`, using commit `7714e47`, reached Ready on 9 October 2026. Its build log at 16:37 IST confirmed: "Accounts, hospital access, source storage and workflow checkpoints are ready." This confirms that the hosted preparation script completed, including the account, hospital and checkpoint migrations.
+
+On 11 October 2026, the GitHub Vercel status for the documentation commit `dfcc700` was also success. That status is deployment evidence, not a runtime account test.
+
+Hospital creation, team management and login/logout have passed database-backed integration tests. A complete hosted sign-up, hospital creation, save/refresh and logout journey remains unverified. The last live-app browser request was blocked by the checking environment, so it did not establish an application outage or a successful account flow.
 
 AI model calls, account email delivery and a live authenticated MCP client have not been verified. No claim of production clinical readiness is made.
+
+## Documentation follow-up
+
+The README now explains the problem and intended benefit, a guided walkthrough, technical terms, the input format, setup commands, verification boundaries and current limits in plain English. It preserves the earlier detailed product documentation and adds a concrete synthetic JSON example.
+
+Documentation checks on 11 October 2026 passed:
+
+- All 26 README Markdown links were examined; local file targets and section anchors exist.
+- The JSON example passes the actual Zod source schema and patient/source validation.
+- Running the example through the real evidence engine removes Mira's one missing follow-up item and preserves all three conflicting contexts.
+- Prettier formatting and `git diff --check` passed for the documentation update.
+
+No application code changed in this documentation update, and the full application suite was not rerun for it.
